@@ -1,0 +1,117 @@
+---
+title: "Notebook for Assignment 1"
+output: html_notebook
+---
+
+##Preliminary setup: Assign libraries 
+```{r}
+#These libraries must be assigned each time the notebook is reopened.
+library(datasets)
+library(tidyverse)
+```
+
+##Step 1:
+###Import data into a tibble
+```{r}
+#Set work directory and read in csv
+setwd("C:/Users/Data")
+
+MedDataT<-as.tibble(read_csv("assignment1.csv"))
+
+#Examine data in viewer or print first 10 lines
+print(head(MedDataT,10))
+```
+###Print out the number of rows and for each column find the percent of null values
+```{r}
+#Determine number of rows and then store
+totalRows<-nrow(MedDataT)
+paste("The number of rows is", totalRows,"!")
+
+#Create vector containing all column names
+names<-c(colnames(MedDataT))
+
+#Set counter for loop
+i=1
+
+#Create for loop 
+for(col in MedDataT){
+  colNulls<-nrow(filter(MedDataT,is.na(col))) #Count nulls per column
+  percentNulls<-round(colNulls/totalRows, digits=4) 
+  final<-paste(names[i],"is", percentNulls,"% null.", sep=' ')
+  print(final)
+  i<-i+1 #Update counter 
+}
+#Examine null percentages for acceptance
+```
+##Step 2:
+###What is a case in these data?
+```{r}
+#A case in these data represents each instance of a prescription drug being administered to a patient during a inpatient or outpatient visit (an "encounter") to a particular hospital. These data need tidying before they are more acceptable to manipulate, visualize, and gain insight from.
+```
+##Step 3:
+###Transform MedDataT to change column names
+```{r}
+#Changing columns 68 and 414 to corresponding medication names
+MedDataT2<-MedDataT %>% rename('CalcGluconate'='68','Celebrex'='414') 
+```
+##Step 4:
+###Provide a count for the number of patients from hospital 30 or 65, aged 40-60
+```{r}
+#Method 1: Chaining
+method1<-MedDataT2 %>% filter(HOSPITAL_ID %in% c(30,65), AGE_IN_YEARS>=40 & AGE_IN_YEARS<=60) %>% nrow()
+paste("The count via chaining is",method1,".")
+
+#Method 2: Nesting
+method2<-nrow(filter(MedDataT2,HOSPITAL_ID %in% c(30,65), AGE_IN_YEARS>=40 & AGE_IN_YEARS<=60))
+paste("The count via nesting is",method2,".")
+
+#Check to see if both methods produce the same value
+identical(method1, method2)
+```
+##Step 5:
+###Select a sample of 25 patients taking Celebrex
+```{r}
+sample1<-dplyr::sample_n(filter(MedDataT2, Celebrex>0), 25)
+```
+###Extract the dose quantity into its own column
+```{r}
+doseQuantity<-c() #Initialize vector
+
+for (line in sample1[[7]]){ 
+  splitOn1<-str_split(line,"\\*") #Split on *
+  dose<-splitOn1[[1]][2]
+  doseVector<-dose[[1]]
+  for (test in doseVector){
+    doseQuantity<-c(doseQuantity, test) #Append new value to existing vector
+  }
+}
+print(doseQuantity)
+
+#Adding new column to existing sample
+sample1$dose_quantity<-doseQuantity
+
+is.data.frame(sample1) #Checking that resulting sample is a dataframe
+
+```
+###Print out subset and order
+```{r}
+select(sample1, PATIENT_ID, ENCOUNTER_ID, dose_quantity, medication_charge_quantity) %>%
+      arrange(PATIENT_ID, ENCOUNTER_ID)
+```
+##Step 6:
+###Create a bar chart displaying number of patients by age 
+```{r}
+ggplot(data=filter(MedDataT2,40<=AGE_IN_YEARS & 50>=AGE_IN_YEARS)) +
+  geom_bar(mapping=aes(x=AGE_IN_YEARS))
+```
+##Step 7:
+###Create a scatterpolot 
+```{r}
+ggplot(data=filter(MedDataT2,!(is.na(AGE_IN_YEARS)) & !(is.na(TOTAL_CHARGES)))) +
+  geom_point(mapping=aes(x=AGE_IN_YEARS,y=TOTAL_CHARGES))
+```
+###Describe trends
+```{r}
+#The scatterplot reveals that as AGE_IN_YEARS increases, the TOTAL_CHARGES for medication is likely to increase. It could be infered that as patient's age, they stay in the hospital for longer periods of time and require more medication, whereby increasing medication cost.
+```
+
